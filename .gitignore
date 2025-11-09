@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Data
+data/
+
+# Vector DB
+chroma_db/
+
+sandbox/
+nul
