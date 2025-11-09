@@ -4,16 +4,22 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+from PIL import Image
+import pytesseract
 
 def load_files(data_dir="data"):
     docs = []
     for fname in os.listdir(data_dir):
+        path = os.path.join(data_dir, fname)
+        text = ""
         if fname.lower().endswith(".pdf"):
-            path = os.path.join(data_dir, fname)
             reader = PdfReader(path)
             text = "".join([p.extract_text() or "" for p in reader.pages])
-            if text.strip():
-                docs.append(Document(page_content=text, metadata={"source": fname}))
+        elif fname.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image = Image.open(path)
+            text = pytesseract.image_to_string(image)
+        if text.strip():
+            docs.append(Document(page_content=text, metadata={"source": fname}))
     return docs
 
 def chunk_files(docs, chunk_size=800, chunk_overlap=100):
