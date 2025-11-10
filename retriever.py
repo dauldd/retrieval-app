@@ -13,6 +13,8 @@ def load_files(data_dir="data"):
     docs = []
     for fname in os.listdir(data_dir):
         path = os.path.join(data_dir, fname)
+        if not os.path.isfile(path):
+            continue
         text = ""
         if fname.lower().endswith(".pdf"):
             reader = PdfReader(path)
@@ -20,6 +22,9 @@ def load_files(data_dir="data"):
         elif fname.lower().endswith(('.png', '.jpg', '.jpeg')):
             image = Image.open(path)
             text = pytesseract.image_to_string(image)
+        elif fname.lower().endswith('.txt'):
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
         if text.strip():
             docs.append(Document(page_content=text, metadata={"source": fname}))
     return docs
