@@ -1,5 +1,5 @@
 import os
-from retriever import load_files, chunk_files, chunks_to_embeddings
+from retriever import load_files, chunk_files, hybrid_retriever
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
@@ -8,11 +8,11 @@ load_dotenv()
 
 docs = load_files("data")
 chunks = chunk_files(docs)
-retriever = chunks_to_embeddings(chunks)
+retriever = hybrid_retriever(chunks)
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
-    temperature=0.5,
+    temperature=0.1,
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
