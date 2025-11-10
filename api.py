@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from pathlib import Path
 import shutil
@@ -17,6 +17,10 @@ api.add_middleware(
 )
 
 api.mount("/static", StaticFiles(directory="static"), name="static")
+
+@api.get("/")
+async def root():
+    return FileResponse("static/index.html")
 
 upload_dir = Path("data")
 upload_dir.mkdir(parents=True, exist_ok=True)
