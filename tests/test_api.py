@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from pathlib import Path
 import tempfile
 import sys
+import random
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -15,6 +16,7 @@ TEST_CONTENT = """
 There were 17 people on the ship yesterday.
 The captain's name was Jack.
 The ship carried 150 livestock units.
+Out of 150 livestock units - 67 cows, 22 chicken, 34 sheeps, 27 goats.
 """
 
 @pytest.fixture(autouse=True)
@@ -78,12 +80,18 @@ def test_query_after_upload():
             )
 
         assert upload_response.status_code == 200
-
+        queries = [
+            "how many livestock units were there on the ship yesterday?",
+            "how many cows were on the ship?",
+            "how many chicken were on the ship?",
+            "how many sheeps were on the ship?",
+            "how many goats were on the ship?",
+        ]
+        selected_query = random.choice(queries)
         query_response = client.post(
-            "/api/query",
-            json={"query": "How many livestock units were there on the ship yesterday?"}
-        )
-
+                "/api/query",
+                json={"query": selected_query}
+            )
 
         assert query_response.status_code == 200
         data = query_response.json()

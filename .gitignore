@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Environment
 .env
@@ -10,6 +11,6 @@ data/
 
 # Vector DB
 chroma_db/
+nul
 
 sandbox/
-nul
