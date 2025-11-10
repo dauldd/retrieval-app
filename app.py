@@ -10,17 +10,40 @@ docs = load_files("data")
 chunks = chunk_files(docs)
 retriever = hybrid_retriever(chunks)
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.1,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
+def create_chain():
+    global qa_chain
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0.1,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        return_source_documents=True
+    )
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    return_source_documents=True
-)
+def initialize():
+    global docs, chunks, retriever
+    docs = load_files("data")
+    chunks = chunk_files(docs)
+    retriever = hybrid_retriever(chunks)
+    create_chain()
+
+def ingest_file(file_path):
+    global docs, chunks, retriever
+
+    new_docs = load_files(os.path.dirname(file_path))
+    new_doc = [d for d in new_docs if d.metadata["source"] == os.path.basename(file_path)]
+    if not new_doc:
+        raise ValueError(f"no text extracted from {file_path}")
+    new_chunks = chunk_files(new_doc)
+    chunks.extend(new_chunks)
+
+    retriever = hybrid_retriever(chunks)
+    create_chain()
+    print(f"indexed {len(new_chunks)} new chunks from {file_path}")
+
 
 while True:
     query = input("ask a question:")
