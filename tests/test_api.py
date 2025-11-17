@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import sys
 import random
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -12,11 +14,35 @@ import app as app_module
 
 client = TestClient(api)
 
+class SemanticEvaluator:
+    _instance = None
+    _model = None
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        if SemanticEvaluator._model is None:
+            SemanticEvaluator._model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.model = SemanticEvaluator._model
+    
+    def calculate_similarity(self, answer: str, expected: str) -> float:
+        embeddings = self.model.encode([answer, expected])
+        similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+        return float(similarity)
+    
+    def is_semantically_correct(self, answer: str, expected: str, threshold = 0.5) -> bool:
+        return self.calculate_similarity(answer, expected) >= threshold
+
 TEST_CONTENT = """
 There were 17 people on the ship yesterday.
 The captain's name was Jack.
 The ship carried 150 livestock units.
 Out of 150 livestock units - 67 cows, 22 chicken, 34 sheeps, 27 goats.
+The Go programming language was created at Google by Robert Griesemer, Rob Pike, and Ken Thompson in 2007.
 """
 
 @pytest.fixture(autouse=True)
@@ -81,26 +107,75 @@ def test_query_after_upload():
 
         assert upload_response.status_code == 200
         queries = [
-            "how many livestock units were there on the ship yesterday?",
-            "how many cows were on the ship?",
-            "how many chicken were on the ship?",
-            "how many sheeps were on the ship?",
-            "how many goats were on the ship?",
+            {
+                "query": "how many livestock units were there on the ship yesterday?",
+                "expected_keywords": ["150",],
+                "should_not_contain": ["67", "22", "34", "27"],
+                "expected_answer": "There were 150 livestock units on the ship"
+            },
+            {
+                "query": "how many cows were on the ship?",
+                "expected_keywords": ["67"],
+                "should_not_contain": ["22", "34", "27", "150"],
+                "expected_answer": "There were 67 cows on the ship"
+            },
+            {
+                "query": "how many chicken were on the ship?",
+                "expected_keywords": ["22"],
+                "should_not_contain": ["67", "34", "27", "150"],
+                "expected_answer": "There were 22 chicken on the ship"
+            },
+            {
+                "query": "how many sheeps were on the ship?",
+                "expected_keywords": ["34"],
+                "should_not_contain": ["67", "22", "27", "150"],
+                "expected_answer": "There were 34 sheep on the ship"
+            },
+            {
+                "query": "how many goats were on the ship?",
+                "expected_keywords": ["27"],
+                "should_not_contain": ["67", "22", "34", "150"],
+                "expected_answer": "There were 27 goats on the ship"
+            },
+            {
+                "query": "who created the Go programming language?",
+                "expected_keywords": ["Griesemer", "Pike", "Thompson"],
+                "should_not_contain": ["Guido", "Linus"],
+                "expected_answer": "Go was created by Robert Griesemer, Rob Pike, and Ken Thompson"
+            }
         ]
         selected_query = random.choice(queries)
         query_response = client.post(
                 "/api/query",
-                json={"query": selected_query}
+                json={"query": selected_query["query"]}
             )
 
         assert query_response.status_code == 200
         data = query_response.json()
+        answer = data["answer"].lower()
+
+        print("query:", selected_query["query"])
         print("answer:", data["answer"])
         print("sources:", data["sources"])
 
         assert "answer" in data
         assert "sources" in data
         assert len(data["sources"]) > 0
+
+        for keyword in selected_query["expected_keywords"]:
+            assert keyword.lower() in answer, \
+                f"Expected keyword '{keyword}' not found in answer: {data['answer']}"
+
+        for forbidden in selected_query["should_not_contain"]:
+            assert forbidden.lower() not in answer, \
+                f"Answer contains incorrect info '{forbidden}': {data['answer']}"
+
+        evaluator = SemanticEvaluator.get_instance()
+        similarity = evaluator.calculate_similarity(data["answer"], selected_query["expected_answer"])
+        print(f"semantic similarity: {similarity:.3f}")
+
+        assert similarity >= 0.5, \
+            f"answer semantically different from expected (similarity: {similarity:.3f})"
 
     finally:
         Path(temp_path).unlink()
