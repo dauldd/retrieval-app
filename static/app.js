@@ -21,5 +21,14 @@ async function sendQuery() {
   })
 
   const data = await res.json()
-  messages.innerHTML += `<div class='bot'>${data.answer || data.error}</div>`
+  let answer = data.answer || data.error
+
+  answer = answer
+    .replace(/\*\*\*([\s\S]+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n\* /g, "\n• ")
+    .replace(/\n(\d+)\. /g, "\n$1. ")
+    .replace(/\n/g, "<br>")
+
+  messages.innerHTML += `<div class='bot'>${answer}</div>`
 }

@@ -1,5 +1,5 @@
 import os
-from retriever import load_files, chunk_files, hybrid_retriever
+from retriever import load_files, chunk_files, HybridRetrieverManager
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ load_dotenv()
 
 docs = []
 chunks = []
-retriever = None
+retriever_manager = HybridRetrieverManager()
 qa_chain = None
 
 def create_chain():
@@ -20,19 +20,19 @@ def create_chain():
     )
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
-        retriever=retriever,
+        retriever=retriever_manager.get_retriever(),
         return_source_documents=True
     )
 
 def initialize():
-    global docs, chunks, retriever
+    global docs, chunks
     docs = load_files("data")
     chunks = chunk_files(docs)
-    retriever = hybrid_retriever(chunks)
+    retriever_manager.add_documents(chunks)
     create_chain()
 
 def ingest_file(file_path):
-    global docs, chunks, retriever
+    global docs, chunks
 
     new_docs = load_files(os.path.dirname(file_path))
     new_doc = [d for d in new_docs if d.metadata["source"] == os.path.basename(file_path)]
@@ -41,7 +41,7 @@ def ingest_file(file_path):
     new_chunks = chunk_files(new_doc)
     chunks.extend(new_chunks)
 
-    retriever = hybrid_retriever(chunks)
+    retriever_manager.add_documents(new_chunks)
     create_chain()
     print(f"indexed {len(new_chunks)} new chunks from {file_path}")
 

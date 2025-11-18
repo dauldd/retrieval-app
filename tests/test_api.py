@@ -174,7 +174,7 @@ def test_query_after_upload():
         similarity = evaluator.calculate_similarity(data["answer"], selected_query["expected_answer"])
         print(f"semantic similarity: {similarity:.3f}")
 
-        assert similarity >= 0.5, \
+        assert similarity >= 0.6, \
             f"answer semantically different from expected (similarity: {similarity:.3f})"
 
     finally:

@@ -6,7 +6,7 @@ The purpose of this project was to analyze the performance and interaction of di
 
 ## Architecture
 
-The application is organized into three components. The [retriever.py](retriever.py) module handles document loading and processing. It reads PDF files, plain text, and images through OCR, then splits the content into 800-character chunks and builds the hybrid retriever. The [app.py](app.py) module manages the application state, tracking uploaded documents and their chunks while coordinating the retriever updates and query execution. Then [api.py](api.py) provides the FastAPI web server with upload and query endpoints with frontend in static/.
+The application is organized into three components. The [retriever.py](retriever.py) module handles document loading and processing. It reads PDF files (PyPDF2), plain text, and images (pytesseract OCR - Tesseract required) through OCR, then splits the content into 800-character chunks with 100-character overlap. The `HybridRetrieverManager` class enables incremental document ingestion - new chunks are added directly to the existing ChromaDB vector database via `add_documents()` without re-embedding previous documents, significantly improving upload performance. The [app.py](app.py) module manages the application state, tracking uploaded documents and their chunks while coordinating the retriever updates and query execution. Then [api.py](api.py) provides the FastAPI web server with upload and query endpoints with frontend in static/.
 
 ```
 ├── app.py               # core logic (state management, QA chain)
@@ -24,9 +24,9 @@ The application is organized into three components. The [retriever.py](retriever
     └── compare_scores.py # score comparison utility
 ```
 
-The system uses a hybrid approach that combines two retrieval methods. BM25 handles traditional keyword matching, while a semantic retriever uses MiniLM embeddings to find semantically similar content. Each method retrieves three results, weighted equally at 50% each, then merged through an ensemble retriever. Vector embeddings are stored in a local ChromaDB database at `./chroma_db/`.
+The system uses a hybrid approach that combines two retrieval methods. BM25 handles traditional keyword matching, while a semantic retriever uses all-MiniLM-L6-v2 embeddings to find semantically similar content. Each method retrieves three results, weighted equally at 50% each, then merged through an ensemble retriever. Vector embeddings are stored in a local ChromaDB database at `./chroma_db/`.
 
-When the new file is uploaded, the system extracts the text, chunks it, adds the chunks to the existing collection, then recreates the retriever from scratch using accumulated chunks. This triggers recreation of the QA chain with the updated retriever.
+When a new file is uploaded, only the new chunks are embedded and added to ChromaDB via `HybridRetrieverManager.add_documents()`. The BM25 index is rebuilt in-memory with all accumulated chunks, and the ensemble retriever is updated. This approach avoids re-processing existing documents, making subsequent uploads significantly faster.
 
 ## API Endpoints
 
@@ -36,7 +36,7 @@ When the new file is uploaded, the system extracts the text, chunks it, adds the
 curl -X POST http://localhost:8000/api/upload -F "file=@document.txt"
 ```
 
-Returns a confirmation message upon successful upload and indexing. The endpoint saves the file to the data/ directory, extracts text according to the file type (PDF, plain text or image), chunks the content, and adds these chunks to the existing collection. The retriever is then rebuilt from scratch using all available chunks, and a new QA chain is created with the updated retriever.
+Uploads file to data/ directory, extracts text by type, chunks content, adds to collection, and rebuilds retriever with all chunks.
 
 ### POST /api/query
 
@@ -46,11 +46,9 @@ curl -X POST http://localhost:8000/api/query \
   -d '{"query": "What is the main topic?"}'
 ```
 
-Returns an answer and a list of source documents. The query is processed by the hybrid retriever, which returns relevant chunks from both bm25 and semantic searches. These chunks are passed to the LLM (gemini-2.5-flash for this project) as context, which generates a natural language answer. The response includes both the answer text and the filenames of the source documents being used.
+Returns answer and source documents. Hybrid retriever processes query and passes relevant chunks to LLM (gemini-2.5-flash) for answer generation.
 
 ## Setup
-
-To complete the setup, install the required dependencies, configure the API key and start the development server.
 
 ```bash
 pip install -r requirements.txt
@@ -60,22 +58,9 @@ uvicorn api:api --reload
 
 The application will be available at http://localhost:8000/
 
-## Configuration
-
-The system processes PDF files using PyPDF2 for text extraction, plain text files through direct reading, and images (png, jpg, jpeg) via pytesseract OCR (Tesseract OCR should be installed in the system for optical character recognition from images).
-
-The retriever is configured in the `hybrid_retriever()` function with a chunk size of 800 characters and 100-character overlap. Both bm25 and semantic retrievers are weighted equally at 0.5 and return three results each. The semantic component uses the all-MiniLM-L6-v2 embedding model from HuggingFace.
-
 ## Testing
 
-The first test (1) checks error handling, file upload functionality and query functionality after upload with randomized query selection.
-
 ```bash
-python tests/test_api.py
-```
-
-The second test (2) starts an interactive comparison of two retrieval methods - BM25 and semantic embeddings from all-MiniLM-L6-v2
-
-```bash
-python tests/compare_scores.py
+python tests/test_api.py           # error handling, upload, query with randomized selection and cosine similarity
+python tests/compare_scores.py     # interactive BM25 vs semantic comparison
 ```

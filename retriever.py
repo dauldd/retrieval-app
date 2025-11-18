@@ -8,6 +8,68 @@ from PIL import Image
 import pytesseract
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
+import os
+import shutil
+
+class HybridRetrieverManager:
+    
+    def __init__(self, persist_dir="./chroma_db", k=3, bm25_weight=0.5, semantic_weight=0.5):
+        self.persist_dir = persist_dir
+        self.k = k
+        self.bm25_weight = bm25_weight
+        self.semantic_weight = semantic_weight
+        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        
+        if os.path.exists(persist_dir) and os.listdir(persist_dir):
+            self.vectordb = Chroma(
+                persist_directory=persist_dir,
+                embedding_function=self.embeddings
+            )
+        else:
+            self.vectordb = Chroma(
+                persist_directory=persist_dir,
+                embedding_function=self.embeddings
+            )
+        
+        self.all_chunks = []
+        self.bm25_retriever = None
+        self.ensemble_retriever = None
+    
+    def add_documents(self, new_chunks):
+        if not new_chunks:
+            return
+        
+        self.vectordb.add_documents(new_chunks)
+
+        self.all_chunks.extend(new_chunks)
+        self.bm25_retriever = BM25Retriever.from_documents(self.all_chunks)
+        self.bm25_retriever.k = self.k
+
+        self._rebuild_ensemble()
+    
+    def _rebuild_ensemble(self):
+        semantic_retriever = self.vectordb.as_retriever(search_kwargs={"k": self.k})
+        self.ensemble_retriever = EnsembleRetriever(
+            retrievers=[self.bm25_retriever, semantic_retriever],
+            weights=[self.bm25_weight, self.semantic_weight]
+        )
+
+    def get_retriever(self):
+        return self.ensemble_retriever
+
+    def get_chunk_count(self):
+        return len(self.all_chunks)
+    
+    def clear(self):
+        self.all_chunks = []
+        self.bm25_retriever = None
+        self.ensemble_retriever = None
+        if os.path.exists(self.persist_dir):
+            shutil.rmtree(self.persist_dir)
+        self.vectordb = Chroma(
+            persist_directory=self.persist_dir,
+            embedding_function=self.embeddings
+        )
 
 def load_files(data_dir="data"):
     docs = []
