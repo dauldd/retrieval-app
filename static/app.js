@@ -6,13 +6,46 @@ async function uploadFile() {
 
   const res = await fetch("/api/upload", { method: "POST", body: formData })
   const data = await res.json()
-  document.getElementById("uploadStatus").innerText = data.message || data.error
+
+  const messages = document.getElementById("messages")
+  const notification = document.createElement("div")
+  notification.className = "upload-notification"
+  notification.innerHTML = `<div class="notification-message">${
+    data.message || data.error
+  }</div>`
+  messages.appendChild(notification)
+  scrollToBottom()
 }
 
 async function sendQuery() {
-  const query = document.getElementById("query").value
+  const queryInput = document.getElementById("query")
+  const sendBtn = document.querySelector(".chat-input button")
+  const query = queryInput.value.trim()
+  if (!query) return
+
+  queryInput.disabled = true
+  sendBtn.disabled = true
+
   const messages = document.getElementById("messages")
-  messages.innerHTML += `<div class='user'>${query}</div>`
+
+  const userMsg = document.createElement("div")
+  userMsg.className = "user"
+  userMsg.innerHTML = `<div class="user-message">${escapeHtml(query)}</div>`
+  messages.appendChild(userMsg)
+
+  queryInput.value = ""
+
+  const loadingContainer = document.createElement("div")
+  loadingContainer.className = "loading-container"
+  loadingContainer.innerHTML = `
+    <div class="loading-dots">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  `
+  messages.appendChild(loadingContainer)
+  scrollToBottom()
 
   const res = await fetch("/api/query", {
     method: "POST",
@@ -21,6 +54,9 @@ async function sendQuery() {
   })
 
   const data = await res.json()
+
+  loadingContainer.remove()
+
   let answer = data.answer || data.error
 
   answer = answer
@@ -30,5 +66,31 @@ async function sendQuery() {
     .replace(/\n(\d+)\. /g, "\n$1. ")
     .replace(/\n/g, "<br>")
 
-  messages.innerHTML += `<div class='bot'>${answer}</div>`
+  const botMsg = document.createElement("div")
+  botMsg.className = "bot"
+  botMsg.innerHTML = `<div class="bot-message">${answer}</div>`
+  messages.appendChild(botMsg)
+  scrollToBottom()
+
+  queryInput.disabled = false
+  sendBtn.disabled = false
+  queryInput.focus()
+}
+
+function handleEnter(event) {
+  if (event.key === "Enter") {
+    event.preventDefault()
+    sendQuery()
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div")
+  div.textContent = text
+  return div.innerHTML
+}
+
+function scrollToBottom() {
+  const messages = document.getElementById("messages")
+  messages.scrollTop = messages.scrollHeight
 }

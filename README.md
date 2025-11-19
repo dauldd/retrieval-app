@@ -15,6 +15,7 @@ The application is organized into three components. The [retriever.py](retriever
 ├── requirements.txt     # dependencies
 ├── README.md            # documentation
 ├── .gitignore
+├── data/                # data for indexing
 ├── static/              # frontend
 │   ├── index.html
 │   ├── app.js
