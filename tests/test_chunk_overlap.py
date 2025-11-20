@@ -192,7 +192,3 @@ def test_chunk_size_constraints(): # chars - characters
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-
-        
-
-        

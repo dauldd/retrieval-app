@@ -4,10 +4,32 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from pathlib import Path
+from contextlib import asynccontextmanager
 import shutil
 import app
 
-api = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    chroma_db_path = Path("./chroma_db")
+    data_path = Path("data")
+
+    has_chroma_data = chroma_db_path.exists() and any(chroma_db_path.iterdir())
+    has_data_files = data_path.exists() and any(
+        f.is_file() and f.suffix.lower() in ['.pdf', '.txt', '.png', '.jpg', '.jpeg']
+        for f in data_path.iterdir()
+    )
+
+    if has_chroma_data and has_data_files:
+        try:
+            print("found existing data and initializing retriever...")
+            app.initialize()
+            print(f"successfully initialized with {len(app.docs)} documents and {len(app.chunks)} chunks")
+        except Exception as e:
+            print(f"couldn't initialize from existing data: {e}")
+    yield
+
+api = FastAPI(lifespan=lifespan)
 
 api.add_middleware(
     CORSMiddleware,
