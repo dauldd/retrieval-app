@@ -1,6 +1,6 @@
 # Document Query Application
 
-Search application that lets a user upload files and ask questions about their contents. The system uses hybrid retrieval combining BM25 keyword matching with semantic embeddings with LLM-based answer generation.
+Search application that lets a user upload files and ask questions about the information within them. The system uses hybrid retrieval, combining BM25 keyword matching, semantic embeddings, and incremental indexing, with LLM-based answer generation.
 
 The purpose of this project was to analyze the performance and interaction of different retrieval methods in document search systems, to explore how hybrid retrieval combining keyword-based and semantic approaches affects result quality, and to allow real-time document queries via FastAPI backend interface.
 
@@ -21,8 +21,10 @@ The application is organized into three components. The [retriever.py](retriever
 │   ├── app.js
 │   └── styles.css
 └── tests/
-    ├── test_api.py      # API tests with randomized queries
-    └── compare_scores.py # score comparison utility
+    ├── test_api.py              # error handling, file upload, randomized query selection, and semantic similarity checks
+    ├── compare_scores.py        # score comparison utility
+    ├── test_incremental.py      # incremental indexing performance and multi-document source retrieval
+    └── test_chunk_overlap.py    # overlap preservation, chunk sizing, and information loss prevention
 ```
 
 The system uses a hybrid approach that combines two retrieval methods. BM25 handles traditional keyword matching, while a semantic retriever uses all-MiniLM-L6-v2 embeddings to find semantically similar content. Each method retrieves three results, weighted equally at 50% each, then merged through an ensemble retriever. Vector embeddings are stored in a local ChromaDB database at `./chroma_db/`.
@@ -49,6 +51,11 @@ curl -X POST http://localhost:8000/api/query \
 
 Returns answer and source documents. Hybrid retriever processes query and passes relevant chunks to LLM (gemini-2.5-flash) for answer generation.
 
+<img width="2493" height="1098" alt="image" src="https://github.com/user-attachments/assets/622c13b2-2373-4d69-9251-2133dd899341" />
+
+Example shown using: Al Balkhi et al. (2025), arXiv:2511.11235.
+
+
 ## Setup
 
 ```bash
@@ -62,6 +69,8 @@ The application will be available at http://localhost:8000/
 ## Testing
 
 ```bash
-python tests/test_api.py           # error handling, upload, query with randomized selection and cosine similarity
+python tests/test_api.py           # error handling, file upload, randomized query selection, and semantic similarity checks
 python tests/compare_scores.py     # interactive BM25 vs semantic comparison
+python tests/test_chunk_overlap.py # overlap preservation, chunk sizing, and information loss prevention
+python tests/test_incremental.py   # incremental indexing performance and multi-document source retrieval
 ```
