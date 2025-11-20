@@ -75,7 +75,7 @@ def test_incremental_indexing_performance():
     """testing that subsequent uploads don't reprocess previous documents"""
 
     time_a = upload_document(DOC_A, "doc_a.txt")
-    print(f"DOC A uplod time: {time_a: 3f}s")
+    print(f"DOC A upload time: {time_a: 3f}s")
 
     time_b = upload_document(DOC_B, "doc_b.txt")
     print(f"DOC B upload time: {time_b: 3f}s")
@@ -139,6 +139,35 @@ def test_incremental_chunk_count():
     assert chunks_after_c > chunks_after_b, "Chunk count did not increase"
 
     print(f"chunk counts increased correctly: {chunks_after_a} → {chunks_after_b} → {chunks_after_c}")
+
+def test_multi_document_sources():
+    """testing whether queries can return sources from multiple documents"""
+
+    upload_document(DOC_A, "doc_a.txt")
+    upload_document(DOC_B, "doc_b.txt")
+
+    response = client.post(
+        "/api/query",
+        json={"query": "tell me all about the ship and the warehouse"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    print(f"query: tell me about the ship and the warehouse")
+    print(f"answer: {data['answer']}")
+    print(f"sources: {data['sources']}")
+
+    assert len(data["sources"]) > 0, "no sources returned"
+
+    answer = data["answer"].lower()
+    has_ship_content = any(keyword in answer for keyword in ["ship", "jack", "17", "livestock"])
+    has_warehouse_content = any(keyword in answer for keyword in ["warehouse", "sarah", "89", "boxes"])
+
+    print(f"contains ship content: {has_ship_content}")
+    print(f"contains warehouse content: {has_warehouse_content}")
+
+    print("multi-document query completed")
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
