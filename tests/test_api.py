@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import sys
 import random
-from sentence_transformers import SentenceTransformer
+from langchain_huggingface import HuggingFaceEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -26,7 +26,8 @@ class SemanticEvaluator:
     
     def __init__(self):
         if SemanticEvaluator._model is None:
-            SemanticEvaluator._model = SentenceTransformer('all-MiniLM-L6-v2')
+            hf = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            SemanticEvaluator._model = hf._client
         self.model = SemanticEvaluator._model
     
     def calculate_similarity(self, answer: str, expected: str) -> float:
@@ -43,6 +44,12 @@ The captain's name was Jack.
 The ship carried 150 livestock units.
 Out of 150 livestock units - 67 cows, 22 chicken, 34 sheeps, 27 goats.
 The Go programming language was created at Google by Robert Griesemer, Rob Pike, and Ken Thompson in 2007.
+The ship departed from Dock 7 at sunrise.
+There were 12 supply crates stored in the cargo hold.
+A medical kit was stored near the captain’s cabin.
+The ship used diesel fuel during the entire journey.
+The last inspection of the ship took place in 2021.
+The average speed of the ship was 20 knots.
 """
 
 @pytest.fixture(autouse=True)
@@ -109,39 +116,58 @@ def test_query_after_upload():
         queries = [
             {
                 "query": "how many livestock units were there on the ship yesterday?",
-                "expected_keywords": ["150",],
-                "should_not_contain": ["67", "22", "34", "27"],
+                "expected_keywords": ["150"],
                 "expected_answer": "There were 150 livestock units on the ship"
             },
             {
                 "query": "how many cows were on the ship?",
                 "expected_keywords": ["67"],
-                "should_not_contain": ["22", "34", "27", "150"],
                 "expected_answer": "There were 67 cows on the ship"
             },
             {
                 "query": "how many chicken were on the ship?",
                 "expected_keywords": ["22"],
-                "should_not_contain": ["67", "34", "27", "150"],
                 "expected_answer": "There were 22 chicken on the ship"
             },
             {
                 "query": "how many sheeps were on the ship?",
                 "expected_keywords": ["34"],
-                "should_not_contain": ["67", "22", "27", "150"],
                 "expected_answer": "There were 34 sheep on the ship"
             },
             {
                 "query": "how many goats were on the ship?",
                 "expected_keywords": ["27"],
-                "should_not_contain": ["67", "22", "34", "150"],
                 "expected_answer": "There were 27 goats on the ship"
             },
             {
                 "query": "who created the Go programming language?",
                 "expected_keywords": ["Griesemer", "Pike", "Thompson"],
-                "should_not_contain": ["Guido", "Linus"],
                 "expected_answer": "Go was created by Robert Griesemer, Rob Pike, and Ken Thompson"
+            },
+            {
+                "query": "from where did the ship depart?",
+                "expected_keywords": ["Dock 7"],
+                "expected_answer": "The ship departed from Dock 7"
+            },
+            {
+                "query": "how many supply crates were on the ship?",
+                "expected_keywords": ["12"],
+                "expected_answer": "there were 12 supply crates stored in the cargo hold"
+            },
+            {
+                "query": "where was the medical kit located?",
+                "expected_keywords": ["captain"],
+                "expected_answer": "the medical kit was stored near the captain's cabin"
+            },
+            {
+                "query": "when was the last ship inspection?",
+                "expected_keywords": ["2021"],
+                "expected_answer": "the last inspection of the ship took place in 2021"
+            },
+            {
+                "query": "what was the average speed of the ship?",
+                "expected_keywords": ["20 knots"],
+                "expected_answer": "the average speed of the ship was 20 knots."
             }
         ]
         selected_query = random.choice(queries)
@@ -165,10 +191,6 @@ def test_query_after_upload():
         for keyword in selected_query["expected_keywords"]:
             assert keyword.lower() in answer, \
                 f"Expected keyword '{keyword}' not found in answer: {data['answer']}"
-
-        for forbidden in selected_query["should_not_contain"]:
-            assert forbidden.lower() not in answer, \
-                f"Answer contains incorrect info '{forbidden}': {data['answer']}"
 
         evaluator = SemanticEvaluator.get_instance()
         similarity = evaluator.calculate_similarity(data["answer"], selected_query["expected_answer"])

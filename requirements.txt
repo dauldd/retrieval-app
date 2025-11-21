@@ -12,5 +12,4 @@ pillow
 pytesseract
 python-dotenv
 pytest
-sentence-transformers
 scikit-learn
